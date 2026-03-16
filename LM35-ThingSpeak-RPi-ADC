@@ -1,0 +1,36 @@
+import requests
+import spidev
+import time
+
+spi=spidev.SpiDev()
+spi.open(0,0)
+spi.max_speed_hz=1350000
+
+API_KEY="MDB37C30JBLASFF3"
+CHANNEL_ID="3299957"
+URL="https://api.thingspeak.com/update"
+
+
+def read_mcp3202(channel):
+    adc=spi.xfer2([1,(2+channel)<<6,0])
+    data=((adc[1]&31)<<8)+adc[2]
+    return data
+
+try:
+    while True:
+        raw_data=read_mcp3202(0)
+        voltage=(raw_data*5)/4095
+        temperature = voltage*100
+        print(f"Temp:{temperature:.2f}C")
+        time.sleep(1)
+        
+        payload={"api_key": API_KEY }
+        payload.update({"field1":temperature})
+        
+        try:
+            response=requests.post(URL,params=payload)
+        except requests.exceptions.RequestException as e:
+            print("Error: ",e)
+        
+except KeyboardInterrupt:
+    spi.close()
